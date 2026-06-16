@@ -1,0 +1,17 @@
+# Core Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+
+# Computer Vision
+opencv-python==4.9.0.80
+numpy==1.26.4
+
+# Face Recognition (install cmake and dlib first; see README)
+setuptools<81
+face_recognition==1.3.0
+
+# Home Assistant Integration
+requests==2.32.2
+
+# MQTT (if using MQTT mode)
+paho-mqtt==1.6.1

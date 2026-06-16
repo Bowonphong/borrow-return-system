@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ยืม-คืนของ | ผู้ใช้งาน</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #0e1117;
+    --panel:   #161b27;
+    --border:  #252d3d;
+    --green:   #4ade80;
+    --cyan:    #22d3ee;
+    --warn:    #f59e0b;
+    --danger:  #ef4444;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --radius:  10px;
+    --font:    'IBM Plex Sans Thai', sans-serif;
+    --mono:    'IBM Plex Mono', monospace;
+    /* mode colours (set by JS) */
+    --accent:  #4ade80;
+    --accent-glow: rgba(74,222,128,.25);
+    --accent-soft: rgba(74,222,128,.1);
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; min-height: 100vh; }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  /* ══════════════════════════════════════
+     ACTION SELECTION OVERLAY
+  ══════════════════════════════════════ */
+  .action-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: radial-gradient(ellipse at 50% 38%, #141e30 0%, #0e1117 70%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0;
+    transition: opacity .3s;
+  }
+  .action-overlay.hidden { display: none; }
+  .overlay-logo {
+    font-size: 52px; margin-bottom: 10px;
+    filter: drop-shadow(0 0 22px rgba(74,222,128,.35));
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  .overlay-title {
+    font-size: 24px; font-weight: 700; margin-bottom: 4px;
+    background: linear-gradient(135deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .overlay-sub { font-size: 13px; color: var(--muted); margin-bottom: 40px; }
+  .action-cards {
+    display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 28px;
+  }
+  .action-card {
+    width: 210px; padding: 32px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    cursor: pointer;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+    user-select: none;
+  }
+  .action-card:hover { transform: translateY(-5px); }
+  .action-card.borrow-card:hover {
+    border-color: var(--green);
+    box-shadow: 0 16px 48px rgba(74,222,128,.18);
+  }
+  .action-card.return-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 16px 48px rgba(34,211,238,.18);
+  }
+  .action-card-icon { font-size: 44px; }
+  .action-card-label { font-size: 17px; font-weight: 700; }
+  .action-card.borrow-card .action-card-label { color: var(--green); }
+  .action-card.return-card .action-card-label { color: var(--cyan); }
+  .action-card-desc  { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
+  /* ══════════════════════════════════════
+     HEADER
+  ══════════════════════════════════════ */
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 0 24px; display: flex; align-items: center; gap: 14px;
+    height: 56px; flex-shrink: 0;
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .mode-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    border: 1px solid; transition: all .3s;
+  }
+  .mode-badge.borrow { background: rgba(74,222,128,.1);  color: var(--green); border-color: rgba(74,222,128,.3); }
+  .mode-badge.return { background: rgba(34,211,238,.1);  color: var(--cyan);  border-color: rgba(34,211,238,.3); }
+  .mode-badge.hidden { display: none; }
+  .status-pills { display: flex; gap: 10px; margin-left: auto; }
+  .pill { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-family: var(--mono); display: flex; align-items: center; gap: 6px; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .btn-change-mode {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 7px; padding: 5px 14px;
+    font-size: 12px; cursor: pointer; font-family: var(--font);
+    transition: all .18s; white-space: nowrap;
+  }
+  .btn-change-mode:hover { border-color: var(--cyan); color: var(--cyan); }
+  .admin-link {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+    transition: all .2s; white-space: nowrap;
+  }
+  .admin-link:hover { color: var(--cyan); border-color: var(--cyan); }
+  /* ══════════════════════════════════════
+     CONTENT
+  ══════════════════════════════════════ */
+  .content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+  /* ── Step indicator ── */
+  .steps { display: flex; gap: 8px; margin-bottom: 20px; }
+  .step { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); transition: all .3s; }
+  .step.active { border-color: var(--accent); background: var(--accent-soft); }
+  .step.done   { border-color: var(--cyan);   background: rgba(34,211,238,.05); }
+  .step-num  { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-bottom: 4px; }
+  .step-label { font-size: 13px; font-weight: 500; }
+  .step.active .step-label { color: var(--accent); }
+  .step.done   .step-label { color: var(--cyan); }
+  /* ── Cards ── */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 18px; }
+  /* ── Grid ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  /* ── Live Camera ── */
+  .live-cam-wrap {
+    position: relative; width: 100%; max-width: 480px;
+    border-radius: 14px; overflow: hidden; background: #000;
+    box-shadow: 0 0 0 2px var(--border); transition: box-shadow .3s;
+  }
+  .live-cam-wrap.detecting  { box-shadow: 0 0 0 2px var(--accent), 0 0 24px var(--accent-glow); }
+  .live-cam-wrap.recognized { box-shadow: 0 0 0 3px var(--cyan),   0 0 32px rgba(34,211,238,.3); }
+  .live-cam-wrap video { width: 100%; display: block; transform: scaleX(-1); }
+  .face-scan-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .face-scan-frame {
+    width: 150px; height: 150px;
+    border: 2px solid rgba(74,222,128,.6); border-radius: 50%;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,.25); transition: border-color .3s; position: relative;
+  }
+  .face-scan-frame::before, .face-scan-frame::after { content: ''; position: absolute; width: 24px; height: 24px; border-color: var(--accent); border-style: solid; }
+  .face-scan-frame::before { top:-3px; left:-3px; border-width:3px 0 0 3px; border-radius:50% 0 0 0; }
+  .face-scan-frame::after  { bottom:-3px; right:-3px; border-width:0 3px 3px 0; border-radius:0 0 50% 0; }
+  .face-scan-frame.recognized { border-color: var(--cyan); }
+  .face-scan-frame.recognized::before, .face-scan-frame.recognized::after { border-color: var(--cyan); }
+  .scan-status-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px 16px;
+    background: linear-gradient(to top, rgba(0,0,0,.85), transparent);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 500;
+  }
+  .scan-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; flex-shrink: 0; }
+  .scan-dot.yellow { background: var(--warn); }
+  .scan-dot.cyan   { background: var(--cyan); }
+  /* ── Identity panel ── */
+  .identity-panel {
+    background: var(--accent-soft); border: 1px solid rgba(74,222,128,.2);
+    border-radius: 12px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px; margin-bottom: 0; transition: all .4s;
+    margin-top: 14px;
+  }
+  .identity-panel.unknown { background: rgba(100,116,139,.06); border-color: rgba(100,116,139,.2); }
+  .identity-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(74,222,128,.15); border: 2px solid rgba(74,222,128,.4);
+    display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+  }
+  .identity-panel.unknown .identity-avatar { background: rgba(100,116,139,.15); border-color: rgba(100,116,139,.3); }
+  .identity-name { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+  .identity-panel.unknown .identity-name { color: var(--muted); }
+  .identity-sub { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 3px; }
+  /* ── Barcode input ── */
+  .barcode-input-wrap { position: relative; }
+  .barcode-input-wrap input {
+    padding-left: 44px !important; font-size: 16px !important; height: 52px;
+    background: var(--bg); border: 2px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: var(--mono); width: 100%; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .barcode-input-wrap input:focus { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
+  .barcode-input-wrap input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .barcode-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; pointer-events: none; }
+  /* ── Result banner ── */
+  .result-banner { padding: 14px 18px; border-radius: 8px; margin-top: 12px; font-size: 14px; display: none; align-items: center; gap: 10px; }
+  .result-banner.show { display: flex; }
+  .result-banner.success { background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.3); color: var(--green); }
+  .result-banner.error   { background: rgba(239,68,68,.1);  border: 1px solid rgba(239,68,68,.3);  color: var(--danger); }
+  .result-banner.info    { background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.3); color: var(--cyan); }
+  /* ── Flash animations ── */
+  @keyframes borrowFlash { 0%{background:rgba(74,222,128,.25)} 100%{background:transparent} }
+  @keyframes returnFlash { 0%{background:rgba(34,211,238,.30);box-shadow:0 0 0 2px rgba(34,211,238,.4)} 100%{background:transparent;box-shadow:none} }
+  .borrow-flash { animation: borrowFlash 1.5s ease-out; }
+  .return-flash { animation: returnFlash 1.5s ease-out; }
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.15); border-top-color: currentColor; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ── After-success choice box ── */
+  .after-success-box {
+    margin-top: 16px;
+    padding: 18px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    display: none;
+  }
+  .after-success-box.show {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── After-success FULL-SCREEN overlay ── */
+  .after-success-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9997;
+    background: rgba(10, 13, 20, .92);
+    backdrop-filter: blur(6px);
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+    animation: overlayIn .25s ease;
+  }
+  .after-success-overlay.show { display: flex; }
+
+  .after-success-label {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .after-success-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    animation: cardPop .3s cubic-bezier(.34, 1.56, .64, 1);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, .6);
+  }
+  .after-success-btns {
+    display: flex;
+    gap: 10px;
+  }
+  .after-success-btns button {
+    flex: 1;
+    padding: 12px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    transition: all .18s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .after-success-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: iconBounce .5s cubic-bezier(.34, 1.56, .64, 1) .1s both;
+  }
+  .after-btn-continue {
+    background: rgba(74, 222, 128, .08);
+    color: var(--green);
+    border-color: rgba(74, 222, 128, .3) !important;
+  }
+  .after-btn-continue:hover { background: rgba(74, 222, 128, .18); }
+  .after-btn-continue.return-mode {
+    background: rgba(34, 211, 238, .08);
+    color: var(--cyan);
+    border-color: rgba(34, 211, 238, .3) !important;
+  }
+  .after-btn-continue.return-mode:hover { background: rgba(34, 211, 238, .18); }
+  .after-btn-home {
+    background: rgba(100, 116, 139, .08);
+    color: var(--muted);
+  }
+  .after-btn-home:hover {
+    background: rgba(100, 116, 139, .18);
+    color: var(--text);
+    border-color: var(--muted) !important;
+  }
+  .after-btn-icon { font-size: 22px; }
+  .after-btn-text { font-size: 12px; }
+  .after-success-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .after-success-title.borrow { color: var(--green); }
+  .after-success-title.return { color: var(--cyan); }
+  .after-success-item {
+    font-size: 15px;
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .after-success-user {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 32px;
+  }
+  .after-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 24px;
+  }
+  .after-question {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    letter-spacing: .3px;
+  }
+  .after-btns {
+    display: flex;
+    gap: 14px;
+    width: 100%;
+  }
+  .after-btns button {
+    flex: 1;
+    padding: 18px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--font);
+    font-weight: 600;
+    transition: all .18s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .after-btn-cont-icon { font-size: 28px; }
+  .after-btn-cont-text { font-size: 13px; }
+  .after-btn-cont-sub  { font-size: 10px; color: var(--muted); }
+  .after-btn-c-borrow {
+    background: rgba(74, 222, 128, .08);
+    border-color: rgba(74, 222, 128, .3);
+    color: var(--green);
+  }
+  .after-btn-c-borrow:hover {
+    background: rgba(74, 222, 128, .18);
+    border-color: var(--green);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(74, 222, 128, .15);
+  }
+  .after-btn-c-return {
+    background: rgba(34, 211, 238, .08);
+    border-color: rgba(34, 211, 238, .3);
+    color: var(--cyan);
+  }
+  .after-btn-c-return:hover {
+    background: rgba(34, 211, 238, .18);
+    border-color: var(--cyan);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(34, 211, 238, .15);
+  }
+  .after-btn-home-style {
+    background: rgba(100, 116, 139, .06);
+    color: var(--muted);
+  }
+  .after-btn-home-style:hover {
+    background: rgba(100, 116, 139, .15);
+    border-color: var(--muted);
+    color: var(--text);
+    transform: translateY(-2px);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes overlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes cardPop {
+    from { opacity: 0; transform: scale(.85) translateY(20px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes iconBounce {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+  }
+
+  @media (max-width: 480px) {
+    .after-success-card { padding: 32px 20px; }
+    .after-success-icon { font-size: 52px; }
+    .after-btns { flex-direction: column; }
+  }
+  /* ── Check overlay (ตรวจสอบรายการ) ── */
+  .check-overlay {
+    position: fixed; inset: 0; z-index: 9998;
+    background: #0e1117;
+    display: flex; flex-direction: column;
+    align-items: center; padding: 32px 20px;
+    overflow-y: auto;
+  }
+  .check-overlay.hidden { display: none; }
+  .check-back-btn {
+    align-self: flex-start; background: transparent;
+    border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 7px 16px; font-size: 13px;
+    cursor: pointer; font-family: var(--font); transition: all .2s;
+    margin-bottom: 28px;
+  }
+  .check-back-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .check-cam-wrap {
+    position: relative; width: 100%; max-width: 400px;
+    border-radius: 14px; overflow: hidden; background: #000;
+    box-shadow: 0 0 0 2px var(--border); transition: box-shadow .3s;
+    margin-bottom: 24px;
+  }
+  .check-cam-wrap.detecting  { box-shadow: 0 0 0 2px var(--warn),  0 0 24px rgba(245,158,11,.2); }
+  .check-cam-wrap.recognized { box-shadow: 0 0 0 3px var(--cyan),  0 0 32px rgba(34,211,238,.25); }
+  .check-cam-wrap video { width: 100%; display: block; transform: scaleX(-1); }
+  .check-face-frame {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .check-face-ring {
+    width: 140px; height: 140px; border-radius: 50%;
+    border: 2px solid rgba(245,158,11,.7);
+    box-shadow: 0 0 0 2000px rgba(0,0,0,.3); transition: border-color .3s;
+  }
+  .check-cam-wrap.recognized .check-face-ring { border-color: var(--cyan); }
+  .check-result-card {
+    width: 100%; max-width: 400px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 24px;
+    transition: border-color .3s;
+  }
+  .check-result-card.has-items  { border-color: rgba(245,158,11,.4); }
+  .check-result-card.no-items   { border-color: rgba(74,222,128,.3); }
+  .check-result-card.scanning   { border-color: var(--border); }
+  .check-user-row {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .check-user-avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(34,211,238,.12); border: 2px solid rgba(34,211,238,.3);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .check-user-name { font-size: 17px; font-weight: 700; color: var(--cyan); }
+  .check-user-sub  { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .check-item-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid rgba(37,45,61,.5);
+  }
+  .check-item-row:last-child { border-bottom: none; }
+  .check-item-icon { font-size: 18px; flex-shrink: 0; }
+  .check-item-name { font-size: 14px; font-weight: 500; flex: 1; }
+  .check-item-bc   { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .check-item-since{ font-size: 11px; color: var(--warn); margin-top: 2px; }
+  .check-empty {
+    text-align: center; padding: 20px 0;
+    color: var(--green); font-size: 15px; font-weight: 500;
+  }
+  .check-empty-icon { font-size: 36px; margin-bottom: 8px; }
+  /* ── ปุ่มตรวจสอบ (มุมขวาล่างของ overlay) ── */
+  .check-trigger-btn {
+    position: absolute; bottom: 28px; right: 32px;
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.3);
+    color: var(--warn); border-radius: 10px;
+    padding: 9px 16px; font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: var(--font);
+    display: flex; align-items: center; gap: 7px;
+    transition: all .2s;
+  }
+  .check-trigger-btn:hover {
+    background: rgba(245,158,11,.15);
+    border-color: var(--warn);
+    box-shadow: 0 0 16px rgba(245,158,11,.15);
+  }
+  @media (max-width: 700px) {
+    .content { padding: 16px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .steps { flex-direction: column; }
+    .live-cam-wrap { max-width: 100%; }
+    .action-card { width: 160px; padding: 24px 14px; }
+    .action-card-icon { font-size: 36px; }
+    .check-trigger-btn { bottom: 20px; right: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ══════════════ ACTION SELECTION OVERLAY ══════════════ -->
+  <div class="action-overlay" id="action-overlay">
+    <div class="overlay-logo">📦</div>
+    <div class="overlay-title">ระบบยืม-คืนของ</div>
+    <div class="overlay-sub">เลือกการดำเนินการ</div>
+    <div class="action-cards">
+      <!-- Borrow -->
+      <div class="action-card borrow-card" onclick="selectMode('borrow')">
+        <div class="action-card-icon">📥</div>
+        <div class="action-card-label">ยืมของ</div>
+        <div class="action-card-desc">สแกนใบหน้า แล้วสแกนบาร์โค้ด<br>สิ่งของที่ต้องการยืม</div>
+      </div>
+      <!-- Return -->
+      <div class="action-card return-card" onclick="selectMode('return')">
+        <div class="action-card-icon">📤</div>
+        <div class="action-card-label">คืนของ</div>
+        <div class="action-card-desc">สแกนใบหน้า แล้วสแกนบาร์โค้ด<br>สิ่งของที่ต้องการคืน</div>
+      </div>
+    </div>
+    <a href="/admin" style="font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:5px 14px;border-radius:6px;transition:all .2s"
+       target="_blank" onmouseover="this.style.color='#22d3ee';this.style.borderColor='#22d3ee'"
+       onmouseout="this.style.color='';this.style.borderColor=''">🔐 Admin</a>
+    <!-- ปุ่มตรวจสอบรายการ — มุมขวาล่าง -->
+    <button class="check-trigger-btn" onclick="openCheckOverlay()">
+      🔍 ตรวจสอบรายการยืม
+    </button>
+  </div>
+  <!-- ══════════════ CHECK OVERLAY ══════════════ -->
+  <div class="check-overlay hidden" id="check-overlay">
+    <button class="check-back-btn" onclick="closeCheckOverlay()">← กลับ</button>
+    <div style="font-size:20px;font-weight:700;margin-bottom:6px;color:var(--warn)">🔍 ตรวจสอบรายการยืม</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">สแกนใบหน้าเพื่อดูของที่ยืมอยู่</div>
+    <div class="check-cam-wrap detecting" id="check-cam-wrap">
+      <video id="check-video" autoplay muted playsinline></video>
+      <canvas id="check-canvas" style="display:none"></canvas>
+      <div class="check-face-frame">
+        <div class="check-face-ring" id="check-face-ring"></div>
+      </div>
+      <div class="scan-status-bar">
+        <div class="scan-dot" id="check-scan-dot"></div>
+        <span id="check-scan-text">กำลังสแกนใบหน้า...</span>
+      </div>
+    </div>
+    <div class="check-result-card scanning" id="check-result-card">
+      <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:13px;">⏳ รอสแกนใบหน้า...</div>
+    </div>
+  </div>
+  <!-- ══════════════ HEADER ══════════════ -->
+  <header>
+    <div style="font-size:22px;">📦</div>
+    <h1>ระบบ<span id="header-mode-text">ยืม-คืน</span>ของ</h1>
+    <span class="mode-badge hidden" id="mode-badge"></span>
+    <div class="status-pills">
+      <div class="pill"><span class="dot"></span><span id="pill-borrowed">0 รายการ</span></div>
+    </div>
+    <button class="btn-change-mode" id="btn-change-mode" onclick="changeMode()" style="display:none">⇄ เปลี่ยน</button>
+    <a href="/admin" class="admin-link" target="_blank">🔐 Admin</a>
+  </header>
+  <!-- ══════════════ CONTENT ══════════════ -->
+  <div class="content">
+    <!-- Step indicator -->
+    <div class="steps">
+      <div class="step active" id="bstep1"><div class="step-num">ขั้นตอน 1</div><div class="step-label" id="step1-label">🎭 สแกนใบหน้า</div></div>
+      <div class="step"       id="bstep2"><div class="step-num">ขั้นตอน 2</div><div class="step-label" id="step2-label">🏷️ สแกนบาร์โค้ด</div></div>
+      <div class="step"       id="bstep3"><div class="step-num">ขั้นตอน 3</div><div class="step-label" id="step3-label">✅ บันทึกสำเร็จ</div></div>
+    </div>
+    <div class="grid2">
+      <!-- ── กล้องสแกนใบหน้า ── -->
+      <div class="card">
+        <div class="card-title">📹 กล้องสดสแกนใบหน้า</div>
+        <!-- Camera selector -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap">📷 กล้อง:</span>
+          <select id="camera-select" onchange="switchCamera(this.value)"
+                  style="flex:1;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">
+            <option value="">กำลังโหลด...</option>
+          </select>
+        </div>
+        <!-- Live camera -->
+        <div class="live-cam-wrap" id="borrow-live-wrap">
+          <video id="borrow-video" autoplay muted playsinline></video>
+          <canvas id="borrow-canvas" style="display:none"></canvas>
+          <div class="face-scan-overlay">
+            <div class="face-scan-frame" id="face-scan-frame"></div>
+          </div>
+          <div class="scan-status-bar">
+            <div class="scan-dot" id="scan-dot"></div>
+            <span id="scan-status-text">กำลังเปิดกล้อง...</span>
+          </div>
+        </div>
+        <!-- Identity panel -->
+        <div class="identity-panel unknown" id="borrow-identity">
+          <div class="identity-avatar" id="identity-avatar">👤</div>
+          <div>
+            <div class="identity-name" id="identity-name">กำลังตรวจจับใบหน้า...</div>
+            <div class="identity-sub"  id="identity-sub">รอสแกนใบหน้าผู้ใช้</div>
+          </div>
+        </div>
+      </div>
+      <!-- ── สแกนบาร์โค้ด ── -->
+      <div class="card" id="action-barcode-card">
+        <div class="card-title" id="barcode-card-title">🏷️ สแกนบาร์โค้ดสิ่งของ</div>
+        <p id="borrow-bc-hint" style="font-size:13px;color:var(--muted);margin-bottom:16px;">
+          ⏳ รอจดจำใบหน้าก่อน...
+        </p>
+        <div class="barcode-input-wrap" style="margin-bottom:16px;">
+          <span class="barcode-icon">📦</span>
+          <input type="text" id="borrow-barcode"
+                 placeholder="สแกนบาร์โค้ดที่นี่..."
+                 disabled
+                 onkeydown="if(event.key==='Enter') onBarcodeEnter()">
+        </div>
+        <div id="borrow-item-info"    class="result-banner" style="margin-bottom:12px;"></div>
+        <div id="borrow-final-result" class="result-banner"></div>
+        <!-- After-success choice -->
+        <div class="after-success-box" id="after-success-box">
+          <div class="after-success-label" id="after-success-label">ต้องการทำอะไรต่อ?</div>
+          <div class="after-success-btns">
+            <button class="after-btn-continue" id="after-btn-continue" onclick="continueCurrentMode()">
+              <span class="after-btn-icon" id="after-btn-icon">📥</span>
+              <span class="after-btn-text" id="after-btn-text">ยืมของต่อ</span>
+            </button>
+            <button class="after-btn-home" onclick="changeMode()">
+              <span class="after-btn-icon">🏠</span>
+              <span class="after-btn-text">กลับหน้าหลัก</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /content -->
+</div><!-- /app -->
+<!-- ══════════════ AFTER-SUCCESS OVERLAY ══════════════ -->
+<div class="after-success-overlay" id="after-success-overlay">
+  <div class="after-success-card">
+    <div class="after-success-icon" id="as-icon">✅</div>
+    <div class="after-success-title" id="as-title">ยืมสำเร็จ!</div>
+    <div class="after-success-item" id="as-item"></div>
+    <div class="after-success-user" id="as-user"></div>
+    <div class="after-divider"></div>
+    <div class="after-question">ต้องการทำอะไรต่อ?</div>
+    <div class="after-btns">
+      <button id="as-btn-continue" onclick="continueCurrentMode()">
+        <span class="after-btn-cont-icon" id="as-cont-icon">📥</span>
+        <span class="after-btn-cont-text" id="as-cont-text">ยืมของต่อ</span>
+        <span class="after-btn-cont-sub">สแกนคนใหม่</span>
+      </button>
+      <button class="after-btn-home-style" onclick="changeMode()">
+        <span class="after-btn-cont-icon">🏠</span>
+        <span class="after-btn-cont-text">กลับหน้าหลัก</span>
+        <span class="after-btn-cont-sub">เลือกโหมดใหม่</span>
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════════════
+//  Mode & State
+// ══════════════════════════════════════════════════
+let currentMode = null; // 'borrow' | 'return'
+let borrowState      = { userId: null, userName: null };
+let borrowStream     = null;
+let faceCheckInterval = null;
+let isRecognizing    = false;
+let faceLockedUserId = null;
+let faceNoHitCount   = 0;
+let facePendingId    = null;
+const FACE_NO_FACE_TIMEOUT = 3;
+let selectedCameraId = null;
+// ══════════════════════════════════════════════════
+//  API helper
+// ══════════════════════════════════════════════════
+const api = async (method, path, body) => {
+  const opts = { method };
+  if (body) { opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(body); }
+  const res  = await fetch(path, opts);
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
+  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  return data;
+};
+function showBanner(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = `result-banner show ${type}`;
+  const icons = { success:'✅', error:'❌', info:'ℹ️' };
+  el.innerHTML = `<span>${icons[type]||''}</span><span>${msg}</span>`;
+}
+function hideBanner(id) { document.getElementById(id).className = 'result-banner'; }
+// ══════════════════════════════════════════════════
+//  Mode selection
+// ══════════════════════════════════════════════════
+function selectMode(mode) {
+  currentMode = mode;
+  const isBorrow = mode === 'borrow';
+  // ── CSS variables สีตาม mode ──
+  const root = document.documentElement;
+  if (isBorrow) {
+    root.style.setProperty('--accent', '#4ade80');
+    root.style.setProperty('--accent-glow', 'rgba(74,222,128,.25)');
+    root.style.setProperty('--accent-soft', 'rgba(74,222,128,.08)');
+  } else {
+    root.style.setProperty('--accent', '#22d3ee');
+    root.style.setProperty('--accent-glow', 'rgba(34,211,238,.25)');
+    root.style.setProperty('--accent-soft', 'rgba(34,211,238,.08)');
+  }
+  // ── Header badge ──
+  const badge = document.getElementById('mode-badge');
+  badge.className = `mode-badge ${mode}`;
+  badge.textContent = isBorrow ? '📥 โหมดยืมของ' : '📤 โหมดคืนของ';
+  document.getElementById('header-mode-text').textContent = isBorrow ? 'ยืม' : 'คืน';
+  document.getElementById('btn-change-mode').style.display = '';
+  // ── Step labels ──
+  document.getElementById('step2-label').textContent = isBorrow ? '📥 สแกนเพื่อยืม' : '📤 สแกนเพื่อคืน';
+  document.getElementById('step3-label').textContent = isBorrow ? '✅ ยืมสำเร็จ' : '✅ คืนสำเร็จ';
+  // ── Barcode card title ──
+  document.getElementById('barcode-card-title').textContent =
+    isBorrow ? '📥 สแกนบาร์โค้ดสิ่งของที่ต้องการยืม' : '📤 สแกนบาร์โค้ดสิ่งของที่ต้องการคืน';
+  // ── ซ่อน overlay ──
+  document.getElementById('action-overlay').classList.add('hidden');
+  // ── เริ่มกล้อง ──
+  startBorrowCamera();
+  loadStatusPill();
+  resetScanState();
+  setBorrowStep(1);
+}
+function changeMode() {
+  // กลับไปหน้าเลือก
+  stopBorrowCamera();
+  clearInterval(faceCheckInterval); faceCheckInterval = null;
+  currentMode = null;
+  resetScanState();
+  document.getElementById('action-overlay').classList.remove('hidden');
+  document.getElementById('mode-badge').className = 'mode-badge hidden';
+  document.getElementById('btn-change-mode').style.display = 'none';
+}
+// ══════════════════════════════════════════════════
+//  Steps
+// ══════════════════════════════════════════════════
+function setBorrowStep(n) {
+  ['bstep1','bstep2','bstep3'].forEach((id,i) => {
+    document.getElementById(id).className = 'step' + (i+1<n?' done':i+1===n?' active':'');
+  });
+}
+// ══════════════════════════════════════════════════
+//  Camera
+// ══════════════════════════════════════════════════
+async function populateCameraList() {
+  try {
+    await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      .then(s => s.getTracks().forEach(t => t.stop()));
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(d => d.kind === 'videoinput');
+    const sel = document.getElementById('camera-select');
+    sel.innerHTML = cameras.map((c,i) => `<option value="${c.deviceId}">${c.label||'กล้อง '+(i+1)}</option>`).join('');
+    const preferred = cameras.find(c =>
+      c.label.toLowerCase().includes('logitech') ||
+      c.label.toLowerCase().includes('hd pro') ||
+      c.label.toLowerCase().includes('webcam')
+    ) || cameras[cameras.length-1];
+    selectedCameraId = preferred.deviceId;
+    sel.value = selectedCameraId;
+    if (cameras.length <= 1) {
+      sel.style.display = 'none';
+      sel.previousElementSibling.style.display = 'none';
+    }
+  } catch(e) { console.warn('camera list error:', e); }
+}
+async function switchCamera(deviceId) {
+  if (!deviceId) return;
+  selectedCameraId = deviceId;
+  if (borrowStream) { borrowStream.getTracks().forEach(t => t.stop()); borrowStream = null; }
+  try {
+    borrowStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId }, width: 1280, height: 720 }, audio: false });
+    document.getElementById('borrow-video').srcObject = borrowStream;
+    setScanStatus('เปลี่ยนกล้องแล้ว กำลังสแกนใบหน้า...', 'scanning');
+  } catch(e) { setScanStatus('เปิดกล้องไม่ได้: ' + e.message, 'error'); }
+}
+async function startBorrowCamera() {
+  const video = document.getElementById('borrow-video');
+  const wrap  = document.getElementById('borrow-live-wrap');
+  if (borrowStream) return;
+  setScanStatus('กำลังเปิดกล้อง...', 'default');
+  try {
+    await populateCameraList();
+    const constraints = selectedCameraId
+      ? { video: { deviceId: { exact: selectedCameraId }, width: 1280, height: 720 }, audio: false }
+      : { video: { facingMode: 'user', width: 640, height: 480 }, audio: false };
+    borrowStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = borrowStream;
+    setScanStatus('กำลังสแกนใบหน้า...', 'scanning');
+    wrap.classList.add('detecting');
+    faceCheckInterval = setInterval(runFaceCheck, 2500);
+  } catch(e) { setScanStatus('ไม่สามารถเปิดกล้องได้: ' + e.message, 'error'); }
+}
+function stopBorrowCamera() {
+  if (faceCheckInterval) { clearInterval(faceCheckInterval); faceCheckInterval = null; }
+  if (borrowStream) { borrowStream.getTracks().forEach(t => t.stop()); borrowStream = null; }
+  const video = document.getElementById('borrow-video');
+  if (video) video.srcObject = null;
+}
+function captureFrame() {
+  const video  = document.getElementById('borrow-video');
+  const canvas = document.getElementById('borrow-canvas');
+  if (!video || !video.videoWidth) return null;
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width,0); ctx.scale(-1,1);
+  ctx.drawImage(video,0,0); ctx.setTransform(1,0,0,1,0,0);
+  return canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+}
+// ══════════════════════════════════════════════════
+//  Face Recognition Loop
+// ══════════════════════════════════════════════════
+async function runFaceCheck() {
+  if (isRecognizing) return;
+  isRecognizing = true;
+  try {
+    const img = captureFrame();
+    if (!img) { isRecognizing = false; return; }
+    const d = await api('POST', '/api/camera/recognize_frame', { image: img });
+    if (d.success) {
+      const user = d.user;
+      faceNoHitCount = 0;
+      if (user.id !== faceLockedUserId) {
+        if (user.id === facePendingId) {
+          facePendingId = null; onFaceRecognized(user);
+        } else {
+          facePendingId = user.id;
+          setScanStatus(`พบใบหน้า ${user.name}...`, 'scanning');
+        }
+      } else {
+        const subEl = document.getElementById('identity-sub');
+        if (subEl) subEl.textContent = `ความมั่นใจ ${user.confidence}%  •  ID ${user.id}`;
+        setScanStatus(`จดจำได้: ${user.name} (${user.confidence}%)`, 'recognized');
+      }
+    } else {
+      facePendingId = null; faceNoHitCount++;
+      if (faceNoHitCount < FACE_NO_FACE_TIMEOUT) {
+        if (faceLockedUserId !== null) setScanStatus(`ไม่เห็นใบหน้า... (${FACE_NO_FACE_TIMEOUT-faceNoHitCount} รอบ)`, 'error');
+        else setScanStatus('กำลังมองหาใบหน้า...', 'scanning');
+      } else {
+        if (faceLockedUserId !== null) resetScanState();
+        else setScanStatus('กำลังสแกนใบหน้า...', 'scanning');
+      }
+    }
+  } catch(e) { /* silent */ } finally { isRecognizing = false; }
+}
+function onFaceRecognized(user) {
+  faceLockedUserId = user.id; faceNoHitCount = 0; facePendingId = null;
+  borrowState.userId = user.id; borrowState.userName = user.name;
+  const wrap  = document.getElementById('borrow-live-wrap');
+  const frame = document.getElementById('face-scan-frame');
+  const panel = document.getElementById('borrow-identity');
+  wrap.classList.remove('detecting'); wrap.classList.add('recognized');
+  frame.classList.add('recognized'); panel.classList.remove('unknown');
+  document.getElementById('identity-avatar').textContent = '✅';
+  document.getElementById('identity-name').textContent = user.name;
+  document.getElementById('identity-sub').textContent  = `ความมั่นใจ ${user.confidence}%  •  ID ${user.id}`;
+  setScanStatus(`จดจำได้: ${user.name} (${user.confidence}%)`, 'recognized');
+  setBorrowStep(2);
+  const bc   = document.getElementById('borrow-barcode');
+  const hint = document.getElementById('borrow-bc-hint');
+  bc.disabled = false; bc.focus();
+  if (currentMode === 'borrow') {
+    hint.textContent = `✅ ${user.name} — สแกนบาร์โค้ดสิ่งของที่ต้องการ📥 ยืม`;
+    hint.style.color = 'var(--green)';
+  } else {
+    hint.textContent = `✅ ${user.name} — สแกนบาร์โค้ดสิ่งของที่ต้องการ📤 คืน`;
+    hint.style.color = 'var(--cyan)';
+  }
+}
+function setScanStatus(text, mode) {
+  const dot  = document.getElementById('scan-dot');
+  const span = document.getElementById('scan-status-text');
+  if (span) span.textContent = text;
+  if (dot) {
+    dot.className = 'scan-dot';
+    if (mode === 'recognized') dot.classList.add('cyan');
+    else if (mode === 'error') dot.classList.add('yellow');
+  }
+}
+// ══════════════════════════════════════════════════
+//  Barcode → Smart Scan (mode-aware)
+// ══════════════════════════════════════════════════
+async function onBarcodeEnter() {
+  const bc = document.getElementById('borrow-barcode').value.trim();
+  if (!bc || !borrowState.userId) return;
+  hideBanner('borrow-item-info'); hideBanner('borrow-final-result');
+  showBanner('borrow-item-info', 'info', '🔍 กำลังตรวจสอบ...');
+  try {
+    const res = await api('POST', '/api/smart_scan', { user_id: borrowState.userId, barcode: bc });
+    const actualAction = res.action; // 'borrow' | 'return'
+    // ── ตรวจสอบว่า action ตรงกับ mode ที่เลือก ──
+    if (actualAction !== currentMode) {
+      const errMsg = currentMode === 'borrow'
+        ? '❌ สิ่งของนี้ถูกยืมอยู่แล้ว — หากต้องการคืน กลับไปเลือก "คืนของ"'
+        : '❌ คุณยังไม่ได้ยืมสิ่งของนี้ — หากต้องการยืม กลับไปเลือก "ยืมของ"';
+      showBanner('borrow-item-info', 'error', errMsg);
+      document.getElementById('borrow-barcode').value = '';
+      document.getElementById('borrow-barcode').focus();
+      setTimeout(() => hideBanner('borrow-item-info'), 5000);
+      return;
+    }
+    const isBorrow = currentMode === 'borrow';
+    const icon     = isBorrow ? '📥' : '📤';
+    const label    = isBorrow ? 'ยืมสำเร็จ' : 'คืนสำเร็จ';
+    const color    = isBorrow ? 'success' : 'info';
+    setBorrowStep(3);
+    showBanner('borrow-item-info', color,
+      `${icon} ${label} — "${res.item_name}" ${isBorrow ? 'ให้' : 'จาก'} ${borrowState.userName}`);
+    showBanner('borrow-final-result', color, res.message);
+    // Flash
+    const card = document.getElementById('action-barcode-card');
+    card.classList.add(isBorrow ? 'borrow-flash' : 'return-flash');
+    setTimeout(() => card.classList.remove('borrow-flash','return-flash'), 1500);
+    loadStatusPill();
+    showAfterSuccessChoice(isBorrow, res.item_name, borrowState.userName);
+  } catch(e) {
+    showBanner('borrow-item-info', 'error', '❌ ' + e.message);
+    document.getElementById('borrow-barcode').value = '';
+    document.getElementById('borrow-barcode').focus();
+    setBorrowStep(2);
+    setTimeout(() => hideBanner('borrow-item-info'), 4000);
+  }
+}
+function resetScanState() {
+  faceLockedUserId = null; facePendingId = null; faceNoHitCount = 0;
+  borrowState = { userId: null, userName: null };
+  document.getElementById('borrow-identity').classList.add('unknown');
+  document.getElementById('identity-avatar').textContent = '👤';
+  document.getElementById('identity-name').textContent = 'กำลังตรวจจับใบหน้า...';
+  document.getElementById('identity-sub').textContent  = 'รอสแกนใบหน้าผู้ใช้';
+  document.getElementById('face-scan-frame').classList.remove('recognized');
+  const wrap = document.getElementById('borrow-live-wrap');
+  wrap.classList.remove('recognized'); wrap.classList.add('detecting');
+  const bc = document.getElementById('borrow-barcode');
+  bc.disabled = true; bc.value = '';
+  const hint = document.getElementById('borrow-bc-hint');
+  hint.textContent = '⏳ รอจดจำใบหน้าก่อน...'; hint.style.color = '';
+  hideBanner('borrow-item-info'); hideBanner('borrow-final-result');
+  hideAfterSuccessChoice();
+  setBorrowStep(1); setScanStatus('กำลังสแกนใบหน้า...', 'scanning');
+}
+function showAfterSuccessChoice(isBorrow, itemName, userName) {
+  const box      = document.getElementById('after-success-box');
+  const label    = document.getElementById('after-success-label');
+  const btn      = document.getElementById('after-btn-continue');
+  const btnIcon  = document.getElementById('after-btn-icon');
+  const btnText  = document.getElementById('after-btn-text');
+  const hint     = document.getElementById('borrow-bc-hint');
+  // ป้อนข้อมูลลงใน overlay
+  document.getElementById('as-icon').textContent  = isBorrow ? '📥' : '📤';
+  const title = document.getElementById('as-title');
+  title.textContent = isBorrow ? 'ยืมสำเร็จ!' : 'คืนสำเร็จ!';
+  title.className   = 'after-success-title ' + (isBorrow ? 'borrow' : 'return');
+  document.getElementById('as-item').textContent  = `📦 ${itemName}`;
+  document.getElementById('as-user').textContent  = `👤 ${userName}`;
+  // ซ่อน barcode input ไว้ก่อน
+  document.getElementById('borrow-barcode').disabled = true;
+  document.getElementById('borrow-barcode').value = '';
+  const contBtn  = document.getElementById('as-btn-continue');
+  document.getElementById('as-cont-icon').textContent = isBorrow ? '📥' : '📤';
+  document.getElementById('as-cont-text').textContent = isBorrow ? 'ยืมของต่อ' : 'คืนของต่อ';
+  contBtn.className = isBorrow ? 'after-btn-c-borrow' : 'after-btn-c-return';
+  hint.textContent = isBorrow
+    ? `✅ ยืมสำเร็จ: ${itemName}`
+    : `✅ คืนสำเร็จ: ${itemName}`;
+  hint.style.color = isBorrow ? 'var(--green)' : 'var(--cyan)';
+  label.textContent = `ต้องการทำอะไรต่อ?`;
+  if (isBorrow) {
+    btn.className = 'after-btn-continue';
+    btnIcon.textContent = '📥';
+    btnText.textContent = 'ยืมของต่อ';
+  } else {
+    btn.className = 'after-btn-continue return-mode';
+    btnIcon.textContent = '📤';
+    btnText.textContent = 'คืนของต่อ';
+  }
+  box.classList.add('show');
+  // แสดง overlay
+  document.getElementById('after-success-overlay').classList.add('show');
+}
+function hideAfterSuccessChoice() {
+  document.getElementById('after-success-box').classList.remove('show');
+  document.getElementById('after-success-overlay').classList.remove('show');
+}
+function continueCurrentMode() {
+  // ซ่อน choice box และ reset เพื่อสแกนคนใหม่ (ไม่หยุด mode)
+  hideAfterSuccessChoice();
+  hideBanner('borrow-item-info');
+  hideBanner('borrow-final-result');
+  // reset เฉพาะใบหน้า (ไม่หยุดกล้อง)
+  // reset ใบหน้า ไม่หยุดกล้องและไม่เปลี่ยน mode
+  faceLockedUserId = null; facePendingId = null; faceNoHitCount = 0;
+  borrowState = { userId: null, userName: null };
+  document.getElementById('borrow-identity').classList.add('unknown');
+  document.getElementById('identity-avatar').textContent = '👤';
+  document.getElementById('identity-name').textContent = 'กำลังตรวจจับใบหน้า...';
+  document.getElementById('identity-sub').textContent  = 'รอสแกนใบหน้าผู้ใช้';
+  document.getElementById('face-scan-frame').classList.remove('recognized');
+  const wrap = document.getElementById('borrow-live-wrap');
+  wrap.classList.remove('recognized'); wrap.classList.add('detecting');
+  const bc = document.getElementById('borrow-barcode');
+  bc.disabled = true; bc.value = '';
+  const hint = document.getElementById('borrow-bc-hint');
+  const isBorrow = currentMode === 'borrow';
+  hint.textContent = isBorrow
+    ? '⏳ รอจดจำใบหน้าก่อน...'
+    : '⏳ รอจดจำใบหน้าก่อน...';
+  hint.textContent = '⏳ รอจดจำใบหน้าก่อน...';
+  hint.style.color = '';
+  setBorrowStep(1);
+  setScanStatus('กำลังสแกนใบหน้า...', 'scanning');
+}
+// ══════════════════════════════════════════════════
+//  Status pill
+// ══════════════════════════════════════════════════
+async function loadStatusPill() {
+  try {
+    const d = await api('GET', '/api/status');
+    document.getElementById('pill-borrowed').textContent = `${d.currently_borrowed} รายการ`;
+  } catch {}
+}
+setInterval(loadStatusPill, 30000);
+// ══════════════════════════════════════════════════
+//  CHECK OVERLAY — ตรวจสอบรายการยืม
+// ══════════════════════════════════════════════════
+let checkStream       = null;
+let checkInterval     = null;
+let checkRecognizing  = false;
+let checkLockedId     = null;
+let checkPendingId    = null;
+let checkNoHitCount   = 0;
+const CHECK_GRACE = 4;   // รอบที่ไม่เห็นหน้าก่อน reset
+async function openCheckOverlay() {
+  // ซ่อน action-overlay, แสดง check-overlay
+  document.getElementById('action-overlay').classList.add('hidden');
+  document.getElementById('check-overlay').classList.remove('hidden');
+  resetCheckState();
+  await startCheckCamera();
+}
+function closeCheckOverlay() {
+  stopCheckCamera();
+  document.getElementById('check-overlay').classList.add('hidden');
+  document.getElementById('action-overlay').classList.remove('hidden');
+}
+async function startCheckCamera() {
+  if (checkStream) return;
+  const video = document.getElementById('check-video');
+  try {
+    // ใช้กล้องที่เลือกไว้แล้ว (selectedCameraId) ถ้ามี
+    const constraints = selectedCameraId
+      ? { video: { deviceId: { exact: selectedCameraId }, width: 1280, height: 720 }, audio: false }
+      : { video: { facingMode: 'user', width: 640, height: 480 }, audio: false };
+    checkStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = checkStream;
+    setCheckStatus('กำลังสแกนใบหน้า...', 'scan');
+    checkInterval = setInterval(runCheckFace, 2500);
+  } catch(e) {
+    setCheckStatus('เปิดกล้องไม่ได้: ' + e.message, 'error');
+  }
+}
+function stopCheckCamera() {
+  if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+  if (checkStream) { checkStream.getTracks().forEach(t => t.stop()); checkStream = null; }
+  const v = document.getElementById('check-video');
+  if (v) v.srcObject = null;
+}
+function captureCheckFrame() {
+  const video  = document.getElementById('check-video');
+  const canvas = document.getElementById('check-canvas');
+  if (!video || !video.videoWidth) return null;
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0); ctx.setTransform(1,0,0,1,0,0);
+  return canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+}
+async function runCheckFace() {
+  if (checkRecognizing) return;
+  checkRecognizing = true;
+  try {
+    const img = captureCheckFrame();
+    if (!img) { checkRecognizing = false; return; }
+    const d = await api('POST', '/api/camera/recognize_frame', { image: img });
+    if (d.success) {
+      const user = d.user;
+      checkNoHitCount = 0;
+      if (user.id !== checkLockedId) {
+        if (user.id === checkPendingId) {
+          // ยืนยัน 2 รอบ → lock และโหลด
+          checkPendingId = null;
+          await onCheckFaceRecognized(user);
+        } else {
+          checkPendingId = user.id;
+          setCheckStatus(`พบใบหน้า ${user.name}...`, 'scan');
+        }
+      } else {
+        setCheckStatus(`จดจำได้: ${user.name} (${user.confidence}%)`, 'recognized');
+      }
+    } else {
+      checkPendingId = null;
+      checkNoHitCount++;
+      if (checkNoHitCount >= CHECK_GRACE && checkLockedId !== null) {
+        resetCheckState();
+        setCheckStatus('กำลังสแกนใบหน้า...', 'scan');
+      } else {
+        if (checkLockedId === null) setCheckStatus('กำลังมองหาใบหน้า...', 'scan');
+        else setCheckStatus(`ไม่เห็นใบหน้า... (${CHECK_GRACE - checkNoHitCount} รอบ)`, 'warn');
+      }
+    }
+  } catch(e) { /* silent */ } finally { checkRecognizing = false; }
+}
+async function onCheckFaceRecognized(user) {
+  checkLockedId = user.id;
+  setCheckStatus(`จดจำได้: ${user.name}`, 'recognized');
+  // เปลี่ยน cam wrap style
+  const wrap = document.getElementById('check-cam-wrap');
+  wrap.classList.remove('detecting'); wrap.classList.add('recognized');
+  // โหลด borrowed items ของ user นี้
+  try {
+    const allBorrowed = await api('GET', '/api/borrowed');
+    const myItems = allBorrowed.filter(r => r.user_id === user.id);
+    renderCheckResult(user, myItems);
+  } catch(e) {
+    renderCheckResult(user, [], e.message);
+  }
+}
+function renderCheckResult(user, items, errMsg) {
+  const card = document.getElementById('check-result-card');
+  if (errMsg) {
+    card.className = 'check-result-card scanning';
+    card.innerHTML = `<div style="color:var(--danger);text-align:center;padding:16px 0">❌ โหลดไม่สำเร็จ: ${errMsg}</div>`;
+    return;
+  }
+  if (items.length === 0) {
+    card.className = 'check-result-card no-items';
+    card.innerHTML = `
+      <div class="check-user-row">
+        <div class="check-user-avatar">✅</div>
+        <div>
+          <div class="check-user-name">${user.name}</div>
+          <div class="check-user-sub">ID ${user.id}  •  ความมั่นใจ ${user.confidence}%</div>
+        </div>
+      </div>
+      <div class="check-empty">
+        <div class="check-empty-icon">🎉</div>
+        ไม่มีรายการยืมค้างอยู่
+      </div>`;
+  } else {
+    const dayBadge = (days) => {
+      if (days === 0) return `<span style="color:var(--green);font-size:10px">⏳ วันนี้</span>`;
+      if (days <= 2)  return `<span style="color:var(--warn);font-size:10px">⚠️ ${days} วัน</span>`;
+      return               `<span style="color:var(--danger);font-size:10px">🔴 ${days} วัน</span>`;
+    };
+    card.className = 'check-result-card has-items';
+    card.innerHTML = `
+      <div class="check-user-row">
+        <div class="check-user-avatar">📋</div>
+        <div>
+          <div class="check-user-name">${user.name}</div>
+          <div class="check-user-sub">ยืมของอยู่ ${items.length} ชิ้น  •  ID ${user.id}</div>
+        </div>
+      </div>
+      ${items.map(it => `
+        <div class="check-item-row">
+          <div class="check-item-icon">📦</div>
+          <div style="flex:1">
+            <div class="check-item-name">${it.item_name}</div>
+            <div class="check-item-bc">${it.barcode}</div>
+            <div class="check-item-since">${dayBadge(it.days_borrowed ?? 0)}  •  ยืมเมื่อ ${it.borrow_time}</div>
+          </div>
+        </div>`).join('')}`;
+  }
+}
+function setCheckStatus(text, mode) {
+  const dot  = document.getElementById('check-scan-dot');
+  const span = document.getElementById('check-scan-text');
+  if (span) span.textContent = text;
+  if (dot) {
+    dot.className = 'scan-dot';
+    if (mode === 'recognized') dot.classList.add('cyan');
+    else if (mode === 'warn')  dot.classList.add('yellow');
+  }
+}
+function resetCheckState() {
+  checkLockedId = null; checkPendingId = null; checkNoHitCount = 0;
+  const wrap = document.getElementById('check-cam-wrap');
+  if (wrap) { wrap.classList.remove('recognized'); wrap.classList.add('detecting'); }
+  const card = document.getElementById('check-result-card');
+  if (card) { card.className = 'check-result-card scanning'; card.innerHTML = '<div style="text-align:center;padding:16px 0;color:var(--muted);font-size:13px;">⏳ รอสแกนใบหน้า...</div>'; }
+  setCheckStatus('กำลังสแกนใบหน้า...', 'scan');
+}
+</script>
+</body>
+</html>
